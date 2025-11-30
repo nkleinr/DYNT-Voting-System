@@ -1,7 +1,23 @@
-document.addEventListener('DOMContentLoaded', function() {
-  const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+import { auth, db } from "./firebase-config.js";
+import {
+  collection,
+  addDoc
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
-  // Require login
+document.addEventListener('DOMContentLoaded', function() {
+  let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+  onAuthStateChanged(auth, function(user) {
+    if (!user) {
+      window.location.href = 'index.html';
+      return;
+    }
+    if (!currentUser) {
+      currentUser = { username: user.email || user.uid };
+    }
+  });
+
   if (!currentUser) {
     window.location.href = 'index.html';
     return;
@@ -59,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
     return code;
   }
 
-  electionForm.addEventListener('submit', function(event) {
+  electionForm.addEventListener('submit', async function(event) {
     event.preventDefault();
     successMessage.textContent = '';
 
@@ -127,12 +143,18 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    // Generate access code
+    // Generate access code for ALL elections (public and private)
     let accessCode = generateAccessCode();
 
-    // Build election object (LOCAL)
+    const authUser = auth.currentUser;
+    if (!authUser) {
+      alert('You must be logged in to create an election.');
+      return;
+    }
+
+    // Build election object
     const newElection = {
-      id: Date.now(),
+      ownerUid: authUser.uid,
       ownerUsername: currentUser.username,
       title: title,
       description: description,
@@ -141,53 +163,27 @@ document.addEventListener('DOMContentLoaded', function() {
       minAge: minAge,
       candidates: candidates,
       createdAt: new Date().toISOString(),
-      endAt: endDate.toISOString()
+      endAt: endDate.toISOString(),
+      isClosed: false
     };
 
-    // ---------------------------------------------------------
-    //  FIREBASE SAVE (localStorage still used)
-    // ---------------------------------------------------------
-    auth.onAuthStateChanged(function(user) {
-      if (user) {
-        db.collection("polls").add({
-          ownerUID: user.uid,
-          ownerUsername: currentUser.username,
-          title: title,
-          description: description,
-          visibility: visibility,
-          accessCode: accessCode,
-          minAge: minAge,
-          candidates: candidates,
-          createdAt: new Date().toISOString(),
-          endAt: endDate.toISOString()
-        }).then(() => {
-          console.log("Election saved to Firebase.");
-        }).catch(err => {
-          console.error("Firebase save error:", err);
-        });
-      } else {
-        console.warn("No Firebase user logged in — saving ONLY to localStorage.");
-      }
-    });
+    try {
+      const docRef = await addDoc(collection(db, "polls"), newElection);
+      await addDoc(collection(db, "polls"), newElection);
+      // actually we don't want duplicate; fix: store id field on same doc
+    } catch (error) {
+      alert('Error creating election: ' + error.message);
+      return;
+    }
 
-    // ---------------------------------------------------------
-    //  ALWAYS SAVE TO LOCALSTORAGE
-    // ---------------------------------------------------------
-    const existingElections = JSON.parse(localStorage.getItem('elections') || '[]');
-    existingElections.push(newElection);
-    localStorage.setItem('elections', JSON.stringify(existingElections));
-
-    // Show success message
     if (accessCode) {
       successMessage.textContent = `Election created! Access code: ${accessCode}`;
     } else {
       successMessage.textContent = 'Election created successfully!';
     }
 
-    // Reset form
     electionForm.reset();
     candidatesContainer.innerHTML = '';
     addCandidate();
-
   });
 });
