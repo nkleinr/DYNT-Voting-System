@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Your Profile</h1>
+
+    <form id="profileForm">
+      <div class="form-group">
+        <label for="profileFullName">Full Name:</label>
+        <input type="text" id="profileFullName" name="fullName" required>
+      </div>
+
+      <div class="form-group">
+        <label for="profileAge">Age:</label>
+        <input type="number" id="profileAge" name="age" required>
+      </div>
+
+      <div class="form-group">
+        <label for="profileUsername">Username:</label>
+        <input type="text" id="profileUsername" name="username" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="profileEmail">Email:</label>
+        <input type="email" id="profileEmail" name="email" required>
+      </div>
+
+      <div class="form-group">
+  <label for="profileOldPassword">Current Password:</label>
+  <input type="password" id="profileOldPassword" name="oldPassword">
+  <div id="profileOldPasswordError" class="error-message"></div>
+</div>
+
+
+      <div class="form-group">
+        <label for="profilePassword">New Password (optional):</label>
+        <input type="password" id="profilePassword" name="password">
+        <div id="profilePasswordError" class="error-message"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="profileConfirmPassword">Confirm New Password:</label>
+        <input type="password" id="profileConfirmPassword" name="confirmPassword">
+        <div id="profileConfirmPasswordError" class="error-message"></div>
+      </div>
+
+      <button type="submit" id="profileSaveButton">Save Changes</button>
+    </form>
+
+    <div class="redirect-section">
+      <p>Done editing?</p>
+      <button onclick="window.location.href='main.html'" class="secondary-button">
+        Back to Main Page
+      </button>
+    </div>
+
+    <div id="profileSuccess" class="success-message"></div>
+  </div>
+
+   <hr style="margin: 2rem 0 1rem 0; border: none; border-top: 1px solid #eee;">
+
+  <h2>Your Voting History</h2>
+<p>These are the elections you have voted in.</p>
+<div id="voteHistory"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+
+  <script src="profile.js"></script>
+</body>
+</html>

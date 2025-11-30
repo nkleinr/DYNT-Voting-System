@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Main Page - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to DYNT VOTING</h1>
+    <div id="userInfo"></div>
+
+     <div class="button-group">
+      <button onclick="window.location.href='profile.html'" class="secondary-button">
+        Profile
+      </button>
+
+      <button onclick="window.location.href='createElection.html'" class="secondary-button">
+        Create Election
+      </button>
+
+      <button onclick="window.location.href='joinElections.html'" class="secondary-button">
+  Join Elections
+</button>
+
+<button onclick="window.location.href='myElections.html'" class="secondary-button">
+  My Elections
+</button>
+
+<button onclick="window.location.href='results.html'" class="secondary-button">
+  Results
+</button>
+
+    
+   <div class="button-group">
+  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ykone@oakland.edu&su=DYNT VOTING Support Request&body=Hello, I need assistance with my DYNT VOTING account." 
+     target="_blank" class="support-button">
+    Contact Support
+  </a>
+  <button onclick="logout()" class="secondary-button">Logout</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+  <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Election - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Create a New Election</h1>
+
+    <form id="electionForm">
+      <div class="form-group">
+        <label for="electionTitle">Election Title:</label>
+        <input type="text" id="electionTitle" name="title" required>
+      </div>
+
+      <div class="form-group">
+        <label for="electionDescription">Description:</label>
+        <textarea id="electionDescription" name="description" rows="3" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Visibility:</label>
+        <div>
+          <label>
+            <input type="radio" name="visibility" value="public" checked>
+            Public (anyone with the code can vote)
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="radio" name="visibility" value="private">
+            Private (only you / restricted later)
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="minAge">Minimum Age to Vote:</label>
+        <input type="number" id="minAge" name="minAge" min="0" value="0" required>
+      </div>
+
+      <div class="form-group">
+  <label for="endDateTime">End Date &amp; Time:</label>
+  <input type="datetime-local" id="endDateTime" required>
+  <p style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+    The election will automatically close at this date and time.
+  </p>
+</div>
+
+
+      <h2>Candidates</h2>
+      <p>You can add multiple candidates. Each can have a name, description, and picture URL.</p>
+
+      <div id="candidatesContainer"></div>
+
+      <button type="button" id="addCandidateButton" class="secondary-button">
+        Add Candidate
+      </button>
+
+      <button type="submit" id="saveElectionButton">Save Election</button>
+    </form>
+
+    <div class="redirect-section">
+      <p>Done here?</p>
+      <button onclick="window.location.href='main.html'" class="secondary-button">
+        Back to Main Page
+      </button>
+    </div>
+
+    <div id="electionSuccess" class="success-message"></div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+  <script src="createElection.js"></script>
+</body>
+</html>

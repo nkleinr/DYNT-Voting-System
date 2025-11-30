@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Elections - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Join Elections</h1>
+    <p>Browse public elections or join one directly with a code.</p>
+
+    <!-- Join by code -->
+    <div class="form-group">
+      <label for="codeInput"><strong>Enter Access Code:</strong></label>
+      <input type="text" id="codeInput" placeholder="e.g., A93KD1">
+      <button id="codeGoButton" class="secondary-button" style="margin-top: 0.5rem;">
+        Go
+      </button>
+    </div>
+
+    <div id="codeError" class="error-message"></div>
+
+    <div id="joinError" class="error-message"></div>
+    <div id="joinSuccess" class="success-message"></div>
+
+    <div id="electionsList"></div>
+
+    <div class="redirect-section">
+      <p>Done voting?</p>
+      <button onclick="window.location.href='main.html'" class="secondary-button">
+        Back to Main Page
+      </button>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+  <script src="joinElections.js"></script>
+</body>
+</html>

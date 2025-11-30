@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Election Results</h1>
+    <p>View results and see which candidate you voted for.</p>
+
+    <div id="resultsError" class="error-message"></div>
+    <div id="resultsSuccess" class="success-message"></div>
+
+    <div id="resultsList"></div>
+
+    <div class="redirect-section">
+      <p>Done here?</p>
+      <button onclick="window.location.href='main.html'" class="secondary-button">
+        Back to Main Page
+      </button>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+  <script src="results.js"></script>
+</body>
+</html>

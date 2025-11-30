@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - DYNT VOTING</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1 id="myH1">Welcome TO DYNT VOTING</h1> 
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="loginUsername">Username:</label>
+        <input type="text" id="loginUsername" name="username" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="loginPassword">Password:</label>
+        <input type="password" id="loginPassword" name="password" required>
+        <div id="loginError" class="error-message"></div>
+      </div>
+      
+      <button type="submit" id="loginSubmit">Login</button>
+    </form>
+
+    <div class="redirect-section">
+      <p>Don't have an account?</p>
+      <button onclick="window.location.href='signup.html'" id="signupButton" class="secondary-button">
+        Sign-up
+      </button>
+    </div>
+  </div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
+
+<script src="firebase-config.js"></script>
+
+
+   <script src="index.js" defer></script>
+</body>
+</html>
