@@ -1,4 +1,17 @@
-document.addEventListener('DOMContentLoaded', async function() {
+import { auth, db } from "./firebase-config.js";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  addDoc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+document.addEventListener('DOMContentLoaded', function() {
   const currentUser = JSON.parse(localStorage.getItem('currentUser'));
 
   if (!currentUser) {
@@ -13,147 +26,58 @@ document.addEventListener('DOMContentLoaded', async function() {
   const codeInput = document.getElementById('codeInput');
   const codeGoButton = document.getElementById('codeGoButton');
 
-  // -------------------------------------------------------
-  // 🔥 FIREBASE: LOAD ELECTIONS FROM FIRESTORE
-  // -------------------------------------------------------
-  let firebaseElections = [];
-  try {
-    const snapshot = await db.collection("polls").get();
-    snapshot.forEach((doc) => {
-      firebaseElections.push({
-        firebaseId: doc.id,
-        ...doc.data()
-      });
+  let elections = [];
+
+  async function loadPublicElections() {
+    elections = [];
+    const q = query(collection(db, "polls"), where("visibility", "==", "public"));
+    const snap = await getDocs(q);
+    snap.forEach(docSnap => {
+      elections.push(docSnap.data());
     });
-    console.log("Loaded Firebase elections:", firebaseElections);
-  } catch (err) {
-    console.warn("Could not load from Firebase. Using localStorage only.", err);
+    renderPublic();
   }
 
-  // -------------------------------------------------------
-  // ORIGINAL LOCAL STORAGE ELECTIONS
-  // -------------------------------------------------------
-  let localElections = JSON.parse(localStorage.getItem('elections') || '[]');
-
-  // -------------------------------------------------------
-  // 🔥 COMBINE BOTH DATA SOURCES (Firebase + Local)
-  // -------------------------------------------------------
-  let elections = [...firebaseElections, ...localElections];
-
-  // -------------------------------------------------------
-  // CLOSE ELECTIONS THAT REACHED END TIME (LOCAL ONLY)
-  // -------------------------------------------------------
-  function autoCloseElections() {
-    let changed = false;
-    const now = new Date();
-
-    localElections.forEach(election => {
-      if (!election.isClosed && election.endAt) {
-        const endTime = new Date(election.endAt);
-        if (!isNaN(endTime.getTime()) && now >= endTime) {
-          election.isClosed = true;
-          election.endedAt = now.toISOString();
-          changed = true;
-        }
+  function getVoteCounts(election, votes) {
+    const counts = new Array(election.candidates.length).fill(0);
+    votes.forEach(v => {
+      if (
+        typeof v.candidateIndex === 'number' &&
+        v.candidateIndex >= 0 &&
+        v.candidateIndex < counts.length
+      ) {
+        counts[v.candidateIndex]++;
       }
     });
-
-    if (changed) {
-      localStorage.setItem('elections', JSON.stringify(localElections));
-    }
-  }
-
-  autoCloseElections();
-  localElections = JSON.parse(localStorage.getItem('elections') || '[]');
-
-  // ----------------------------------------------------
-  // ORIGINAL FUNCTIONS BELOW (unchanged)
-  // ----------------------------------------------------
-
-  function getVoteCounts(election) {
-    const counts = new Array(election.candidates.length).fill(0);
-
-    // Local votes
-    if (Array.isArray(election.votes)) {
-      election.votes.forEach(v => {
-        if (
-          typeof v.candidateIndex === 'number' &&
-          v.candidateIndex >= 0 &&
-          v.candidateIndex < counts.length
-        ) {
-          counts[v.candidateIndex]++;
-        }
-      });
-    }
-
-    // Firebase votes
-    if (Array.isArray(election.firebaseVotes)) {
-      election.firebaseVotes.forEach(v => {
-        counts[v.candidateIndex]++;
-      });
-    }
-
     return counts;
   }
 
-  function userHasVoted(election) {
-    if (Array.isArray(election.votes)) {
-      if (election.votes.some(v => v.username === currentUser.username)) {
-        return true;
-      }
-    }
-
-    if (Array.isArray(election.firebaseVotes)) {
-      if (election.firebaseVotes.some(v => v.uid === auth.currentUser?.uid)) {
-        return true;
-      }
-    }
-
-    return false;
+  async function loadVotes(electionId) {
+    const voteSnap = await getDocs(collection(db, "polls", electionId, "votes"));
+    const votes = [];
+    voteSnap.forEach(v => votes.push(v.data()));
+    return votes;
   }
 
-  async function loadFirebaseVotes(election) {
-    if (!election.firebaseId) return;
-
-    try {
-      const snapshot = await db
-        .collection("polls")
-        .doc(election.firebaseId)
-        .collection("votes")
-        .get();
-
-      election.firebaseVotes = [];
-      snapshot.forEach(doc => {
-        election.firebaseVotes.push(doc.data());
-      });
-    } catch (err) {
-      console.warn("Could not load Firebase votes:", err);
-    }
+  function userHasVoted(votes, username) {
+    return votes.some(v => v.username === username);
   }
 
-  // RENDER EACH ELECTION
-  async function renderElectionCard(election) {
-    if (election.firebaseId) {
-      await loadFirebaseVotes(election);
-    }
-
-    let card = document.getElementById(`election-${election.id || election.firebaseId}`);
+  function renderElectionCard(election, votes) {
+    let card = document.getElementById(`election-${election.id}`);
     if (card) return card;
 
-    const cardId = election.id || election.firebaseId;
+    const voteCounts = getVoteCounts(election, votes);
+    const hasVoted = userHasVoted(votes, currentUser.username);
+    const isClosed = !!election.isClosed;
 
     card = document.createElement('div');
     card.className = 'election-card';
-    card.id = `election-${cardId}`;
+    card.id = `election-${election.id}`;
     card.style.textAlign = 'left';
     card.style.marginTop = '1.5rem';
     card.style.paddingTop = '1rem';
     card.style.borderTop = '1px solid #eee';
-
-    const status = election.isClosed ? 'Closed' : 'Open';
-    const voteCounts = getVoteCounts(election);
-    const hasVoted = userHasVoted(election);
-    const isClosed = !!election.isClosed;
 
     let candidatesHtml = '';
     election.candidates.forEach((candidate, cIndex) => {
@@ -161,27 +85,29 @@ document.addEventListener('DOMContentLoaded', async function() {
       candidatesHtml += `
         <div class="form-group">
           <label>
-            <input type="radio" name="candidate-${cardId}" value="${cIndex}">
+            <input type="radio" name="candidate-${election.id}" value="${cIndex}">
             <strong>${candidate.name || 'Unnamed Candidate'}</strong>
           </label>
           <div style="margin-left: 1.25rem; font-size: 0.9rem;">
-            ${candidate.description || ''}
-            ${candidate.imageUrl ? `<br><img src="${candidate.imageUrl}" style="max-width: 100%; max-height: 150px;">` : ''}
+            ${candidate.description ? candidate.description : ''}
+            ${candidate.imageUrl ? `<br><img src="${candidate.imageUrl}" alt="Candidate image" style="max-width: 100%; max-height: 150px; margin-top: 0.25rem;">` : ''}
             <br><span>Votes: ${votesForThis}</span>
           </div>
         </div>
       `;
     });
 
+    const status = election.isClosed ? 'Closed' : 'Open';
+
     card.innerHTML = `
       <h2>${election.title}</h2>
       <p>${election.description}</p>
       <p><strong>Status:</strong> ${status}</p>
-      <p><strong>Created by:</strong> ${election.ownerUsername || 'Unknown'}</p>
-      <p><strong>Visibility:</strong> ${election.visibility}</p>
+      <p><strong>Created by:</strong> ${election.ownerUsername}</p>
+      <p><strong>Visibility:</strong> ${election.visibility === 'public' ? 'Public' : 'Private'}</p>
       <p><strong>Minimum Age:</strong> ${election.minAge}</p>
-      <p><strong>Access Code:</strong> ${election.accessCode}</p>
-      <p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>
+      ${election.accessCode ? `<p><strong>Access Code:</strong> ${election.accessCode}</p>` : ''}
+      ${election.endAt ? `<p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>` : ''}
       <h3>Candidates</h3>
       ${candidatesHtml}
     `;
@@ -198,10 +124,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       voteButton.textContent = 'Already Voted';
     }
 
-    voteButton.addEventListener('click', function() {
-      if (!voteButton.disabled) {
-        handleVote(election, card, voteButton);
-      }
+    voteButton.addEventListener('click', async function() {
+      if (voteButton.disabled) return;
+      await handleVote(election.id, card, voteButton);
     });
 
     card.appendChild(voteButton);
@@ -210,101 +135,90 @@ document.addEventListener('DOMContentLoaded', async function() {
     return card;
   }
 
-  // -------------------------------------------------------
-  // 🔥 FIREBASE + LOCALSTORAGE VOTING
-  // -------------------------------------------------------
-  async function handleVote(election, cardElement, voteButton) {
+  async function handleVote(electionId, cardElement, voteButton) {
     joinError.textContent = '';
     joinSuccess.textContent = '';
 
+    const elecDoc = await getDoc(doc(db, "polls", electionId));
+    if (!elecDoc.exists()) {
+      joinError.textContent = 'Election not found.';
+      return;
+    }
+    const election = elecDoc.data();
+
     if (election.isClosed) {
-      joinError.textContent = 'This election has ended.';
+      joinError.textContent = 'This election has ended. You can no longer vote.';
+      voteButton.disabled = true;
+      voteButton.textContent = 'Election Closed';
       return;
     }
 
-    if (currentUser.age < election.minAge) {
-      joinError.textContent = `You must be at least ${election.minAge} to vote.`;
+    if (typeof currentUser.age === 'number') {
+      if (currentUser.age < election.minAge) {
+        joinError.textContent = `You must be at least ${election.minAge} to vote in this election.`;
+        return;
+      }
+    } else {
+      joinError.textContent = 'Your account is missing a valid age. Update your profile first.';
       return;
     }
 
-    if (userHasVoted(election)) {
-      joinError.textContent = 'You already voted.';
+    if (election.visibility === 'private') {
+      if (election.ownerUsername !== currentUser.username) {
+        joinError.textContent = 'This is a private election. Only the owner can vote at this time.';
+        return;
+      }
+    }
+
+    const votes = await loadVotes(electionId);
+    if (userHasVoted(votes, currentUser.username)) {
+      joinError.textContent = 'You have already voted in this election.';
+      voteButton.disabled = true;
+      voteButton.textContent = 'Already Voted';
       return;
     }
 
-    const radioName = `candidate-${election.id || election.firebaseId}`;
-    const selectedRadio = cardElement.querySelector(
-      `input[name="${radioName}"]:checked`
-    );
-
+    const radioName = `candidate-${electionId}`;
+    const selectedRadio = cardElement.querySelector(`input[name="${radioName}"]:checked`);
     if (!selectedRadio) {
-      joinError.textContent = 'Select a candidate first.';
+      joinError.textContent = 'Please select a candidate before voting.';
       return;
     }
 
     const candidateIndex = parseInt(selectedRadio.value, 10);
-
-    // ----------------------------------------------------
-    // 🔥 FIREBASE VOTE SAVE
-    // ----------------------------------------------------
-    if (election.firebaseId) {
-      try {
-        await db.collection("polls")
-          .doc(election.firebaseId)
-          .collection("votes")
-          .doc(auth.currentUser.uid)
-          .set({
-            uid: auth.currentUser.uid,
-            candidateIndex: candidateIndex,
-            votedAt: new Date().toISOString()
-          });
-
-        console.log("Vote saved to Firebase.");
-      } catch (err) {
-        console.warn("Firebase vote save failed:", err);
-      }
+    if (
+      Number.isNaN(candidateIndex) ||
+      candidateIndex < 0 ||
+      candidateIndex >= election.candidates.length
+    ) {
+      joinError.textContent = 'Invalid candidate selection.';
+      return;
     }
 
-    // ----------------------------------------------------
-    // LOCAL BACKUP
-    // ----------------------------------------------------
-    const allLocal = JSON.parse(localStorage.getItem('elections') || '[]');
-    const idx = allLocal.findIndex(e => e.id === election.id);
-    if (idx !== -1) {
-      if (!Array.isArray(allLocal[idx].votes)) {
-        allLocal[idx].votes = [];
-      }
-      allLocal[idx].votes.push({
-        username: currentUser.username,
-        candidateIndex: candidateIndex,
-        votedAt: new Date().toISOString()
-      });
+    const voteRef = doc(collection(db, "polls", electionId, "votes"), currentUser.username);
+    await setDoc(voteRef, {
+      username: currentUser.username,
+      candidateIndex: candidateIndex,
+      votedAt: new Date().toISOString()
+    });
 
-      localStorage.setItem('elections', JSON.stringify(allLocal));
-    }
-
-    joinSuccess.textContent = 'Your vote has been recorded!';
+    joinSuccess.textContent = 'Your vote has been recorded successfully!';
     voteButton.disabled = true;
     voteButton.textContent = 'Already Voted';
 
-    setTimeout(() => window.location.reload(), 800);
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
   }
 
-  // -------------------------------------------------------
-  // RENDER INITIAL PUBLIC ELECTIONS
-  // -------------------------------------------------------
-  const publicElections = elections.filter(e => e.visibility === 'public');
-  if (publicElections.length === 0) {
-    electionsList.innerHTML = '<p>No public elections available.</p>';
-  } else {
-    for (let e of publicElections) {
-      await renderElectionCard(e);
+  async function renderPublic() {
+    electionsList.innerHTML = '';
+    for (const election of elections) {
+      const votes = await loadVotes(election.id);
+      renderElectionCard(election, votes);
     }
   }
 
-  // -------------------------------------------------------
-  // 🔥 JOIN BY CODE (Firebase + Local)
-  // -------------------------------------------------------
   async function handleCodeSearch() {
     codeError.textContent = '';
     joinError.textContent = '';
@@ -315,34 +229,32 @@ document.addEventListener('DOMContentLoaded', async function() {
       codeError.textContent = 'Please enter a code.';
       return;
     }
+
     const code = rawCode.toUpperCase();
 
-    // 1. Try Firebase match
-    let match = firebaseElections.find(
-      e => e.accessCode && e.accessCode.toUpperCase() === code
-    );
+    const q = query(collection(db, "polls"), where("accessCode", "==", code));
+    const snap = await getDocs(q);
 
-    // 2. Fall back to localStorage
-    if (!match) {
-      match = localElections.find(
-        e => e.accessCode && e.accessCode.toUpperCase() === code
-      );
-    }
-
-    if (!match) {
+    if (snap.empty) {
       codeError.textContent = 'No election found for that code.';
       return;
     }
 
-    const card = await renderElectionCard(match);
+    const election = snap.docs[0].data();
+    const votes = await loadVotes(election.id);
+
+    const card = renderElectionCard(election, votes);
 
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.style.transition = 'background-color 0.5s';
     card.style.backgroundColor = '#e8f0fe';
-    setTimeout(() => { card.style.backgroundColor = 'white'; }, 1200);
+    setTimeout(() => {
+      card.style.backgroundColor = 'white';
+    }, 1200);
   }
 
   codeGoButton.addEventListener('click', handleCodeSearch);
+
   codeInput.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -350,4 +262,5 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   });
 
+  loadPublicElections();
 });
