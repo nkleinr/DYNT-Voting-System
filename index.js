@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase-config.js";
 import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', function() {
   const loginForm = document.getElementById('loginForm');
@@ -9,36 +9,36 @@ document.addEventListener('DOMContentLoaded', function() {
   loginForm.addEventListener('submit', async function(event) {
     event.preventDefault();
     
-    const usernameInput = document.getElementById('loginUsername').value;
+    const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
 
     loginError.textContent = '';
 
-    let emailToUse = usernameInput;
-    if (!usernameInput.includes('@')) {
-      emailToUse = usernameInput + "@dynt.fake";
-    }
-
     try {
-      const loginResult = await signInWithEmailAndPassword(auth, emailToUse, password);
-      const user = loginResult.user;
+      // Find user by username
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("username", "==", username));
+      const snap = await getDocs(q);
 
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        loginError.textContent = 'Account data not found.';
+      if (snap.empty) {
+        loginError.textContent = "Username not found.";
         return;
       }
 
-      const userData = userSnap.data();
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-      
-      alert('Login successful! Redirecting to main page...');
-      window.location.href = 'main.html';
+      const userData = snap.docs[0].data();
+      const realEmail = userData.email;
+
+      // Login with the REAL email
+      const loginResult = await signInWithEmailAndPassword(auth, realEmail, password);
+
+      // Save user info for other pages
+      localStorage.setItem("currentUser", JSON.stringify(userData));
+
+      alert("Login successful! Redirecting...");
+      window.location.href = "main.html";
 
     } catch (error) {
-      loginError.textContent = 'Invalid login. Please try again.';
+      loginError.textContent = "Invalid username or password.";
     }
   });
 });
