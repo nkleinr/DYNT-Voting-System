@@ -3,7 +3,8 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDxD7i3XyW108_8If_DwbEhnXtOndEcEI",
+
+  apiKey: "AIzaSyDxD7iK3xYW1O8_8if_DwbEhnXtOndEcEI",
   authDomain: "dynt-voting.firebaseapp.com",
   projectId: "dynt-voting",
   storageBucket: "dynt-voting.firebasestorage.app",
@@ -15,3 +16,4 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
