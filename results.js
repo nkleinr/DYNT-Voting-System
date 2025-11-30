@@ -1,5 +1,27 @@
-document.addEventListener('DOMContentLoaded', async function() {
-  const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+import { auth, db } from "./firebase-config.js";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  where
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+document.addEventListener('DOMContentLoaded', function() {
+
+  let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+  onAuthStateChanged(auth, function(user) {
+    if (!user) {
+      window.location.href = 'index.html';
+      return;
+    }
+    if (!currentUser) {
+      currentUser = { username: user.email || user.uid };
+    }
+  });
 
   if (!currentUser) {
     window.location.href = 'index.html';
@@ -10,68 +32,44 @@ document.addEventListener('DOMContentLoaded', async function() {
   const resultsError = document.getElementById('resultsError');
   const resultsSuccess = document.getElementById('resultsSuccess');
 
-  // Load Firebase elections
-  let firebaseElections = [];
-  try {
-    const snapshot = await db.collection("polls").get();
-    snapshot.forEach(doc => {
-      firebaseElections.push({
-        firebaseId: doc.id,
-        ...doc.data()
-      });
-    });
-  } catch (err) {}
+  let elections = [];
 
-  // Load local elections
-  let elections = JSON.parse(localStorage.getItem('elections') || '[]');
-
-  if (firebaseElections.length === 0 && elections.length === 0) {
-    resultsList.innerHTML = '<p>No elections exist yet.</p>';
-    return;
+  async function loadAllElections() {
+    const snap = await getDocs(collection(db, "polls"));
+    elections = [];
+    snap.forEach(docSnap => elections.push(docSnap.data()));
   }
 
-  elections = [...firebaseElections, ...elections];
+  async function loadElectionById(id) {
+    const ref = doc(db, "polls", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return snap.data();
+  }
 
-  // Read ?id=... from the URL (if present)
-  const params = new URLSearchParams(window.location.search);
-  const electionIdParam = params.get('id');
+  async function loadVotes(electionId) {
+    const voteSnap = await getDocs(collection(db, "polls", electionId, "votes"));
+    const votes = [];
+    voteSnap.forEach(v => votes.push(v.data()));
+    return votes;
+  }
 
-  // ---------- Helper functions ----------
-
-  // Count votes per candidate
-  function getVoteCounts(election) {
+  function getVoteCounts(election, votes) {
     const counts = new Array(election.candidates.length).fill(0);
-
-    if (Array.isArray(election.votes)) {
-      election.votes.forEach(v => {
-        if (
-          typeof v.candidateIndex === 'number' &&
-          v.candidateIndex >= 0 &&
-          v.candidateIndex < counts.length
-        ) {
-          counts[v.candidateIndex]++;
-        }
-      });
-    }
-
-    if (Array.isArray(election.firebaseVotes)) {
-      election.firebaseVotes.forEach(v => {
-        if (
-          typeof v.candidateIndex === 'number' &&
-          v.candidateIndex >= 0 &&
-          v.candidateIndex < counts.length
-        ) {
-          counts[v.candidateIndex]++;
-        }
-      });
-    }
-
+    votes.forEach(v => {
+      if (
+        typeof v.candidateIndex === 'number' &&
+        v.candidateIndex >= 0 &&
+        v.candidateIndex < counts.length
+      ) {
+        counts[v.candidateIndex]++;
+      }
+    });
     return counts;
   }
 
-  // Compute winner info
-  function computeWinner(election) {
-    const counts = getVoteCounts(election);
+  function computeWinner(election, votes) {
+    const counts = getVoteCounts(election, votes);
     const totalVotes = counts.reduce((sum, c) => sum + c, 0);
 
     if (totalVotes === 0) {
@@ -93,93 +91,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     return {
       totalVotes,
-      winners,   // array of candidate indexes
+      winners,
       maxVotes
     };
   }
 
-  // Which candidate did the current user vote for?
-  function getUserVoteIndex(election) {
-    if (Array.isArray(election.votes)) {
-      const vote = election.votes.find(v => v.username === currentUser.username);
-      if (vote) return vote.candidateIndex;
-    }
-
-    if (Array.isArray(election.firebaseVotes)) {
-      const vote = election.firebaseVotes.find(v => v.uid === auth.currentUser?.uid);
-      if (vote) return vote.candidateIndex;
-    }
-
-    return null;
+  function getUserVoteIndex(votes, username) {
+    const vote = votes.find(v => v.username === username);
+    return vote ? vote.candidateIndex : null;
   }
 
-  //  Load Firebase votes into election object
-  async function loadFirebaseVotes(election) {
-    if (!election.firebaseId) return;
-
-    try {
-      const snapshot = await db
-        .collection("polls")
-        .doc(election.firebaseId)
-        .collection("votes")
-        .get();
-
-      election.firebaseVotes = [];
-      snapshot.forEach(doc => election.firebaseVotes.push(doc.data()));
-    } catch (err) {}
-  }
-
-  //  Auto-close elections whose end time has passed and "export" results
-  function autoCloseElections() {
-    let changed = false;
-    const now = new Date();
-
-    elections.forEach(election => {
-      if (!election.isClosed && election.endAt) {
-        const endTime = new Date(election.endAt);
-        if (!isNaN(endTime.getTime()) && now >= endTime) {
-          // Close and compute winner
-          const winnerInfo = computeWinner(election);
-          election.isClosed = true;
-          election.endedAt = now.toISOString();
-          election.resultSummary = winnerInfo; // this is the "exported" result
-          changed = true;
-        }
-      }
-    });
-
-    if (changed) {
-      localStorage.setItem('elections', JSON.stringify(elections));
-    }
-  }
-
-  // Run auto-close before rendering
-  autoCloseElections();
-
-  // ---------- Decide what to show ----------
-
-  let filteredElections;
-
-  if (electionIdParam) {
-    filteredElections = elections.filter(election =>
-      String(election.id) === String(electionIdParam) ||
-      String(election.firebaseId) === String(electionIdParam)
-    );
-
-    if (filteredElections.length === 0) {
-      resultsList.innerHTML = '<p>No election found for that link.</p>';
-      return;
-    }
-  } else {
-    filteredElections = elections;
-  }
-
-  // ---------- Render results ----------
-
-  for (let election of filteredElections) {
-    if (election.firebaseId) {
-      await loadFirebaseVotes(election);
-    }
+  async function renderElection(election) {
+    const votes = await loadVotes(election.id);
+    const winnerInfo = computeWinner(election, votes);
+    const totalVotes = winnerInfo.totalVotes;
+    const voteCounts = getVoteCounts(election, votes);
+    const yourVoteIndex = getUserVoteIndex(votes, currentUser.username);
 
     const card = document.createElement('div');
     card.className = 'election-card';
@@ -189,10 +116,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     card.style.borderTop = '1px solid #eee';
 
     const status = election.isClosed ? 'Closed' : 'Open';
-    const winnerInfo = computeWinner(election);
-    const totalVotes = winnerInfo.totalVotes;
-    const voteCounts = getVoteCounts(election);
-    const yourVoteIndex = getUserVoteIndex(election);
 
     let resultText = '';
     if (!election.isClosed) {
@@ -244,4 +167,32 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     resultsList.appendChild(card);
   }
+
+  async function main() {
+    const params = new URLSearchParams(window.location.search);
+    const electionIdParam = params.get('id');
+
+    if (electionIdParam) {
+      const election = await loadElectionById(electionIdParam);
+      if (!election) {
+        resultsList.innerHTML = '<p>No election found for that link.</p>';
+        return;
+      }
+      await renderElection(election);
+      return;
+    }
+
+    await loadAllElections();
+
+    if (elections.length === 0) {
+      resultsList.innerHTML = '<p>No elections exist yet.</p>';
+      return;
+    }
+
+    for (const election of elections) {
+      await renderElection(election);
+    }
+  }
+
+  main();
 });
