@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign Up - My Website</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .error-message {
+      color: red;
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -48,16 +55,13 @@
 
     <div class="redirect-section">
       <p>Already have an account?</p>
-      <button onclick="window.location.href='index.html'" id="loginButton" class="secondary-button">
+      <button onclick="window.location.href='index.html'" class="secondary-button">
         Login Here
       </button>
     </div>
   </div>
 
-  <!-- Firebase config -->
   <script type="module" src="./firebase-config.js"></script>
-
-  <!-- Signup script -->
   <script type="module" src="./signup.js"></script>
 
 </body>
