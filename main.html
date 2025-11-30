@@ -41,33 +41,8 @@
   <button onclick="logout()" class="secondary-button">Logout</button>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js"></script>
-
-<script type="module" src="firebase-config.js"></script>
-
-
-  <script type="module" src="main.js"></script>
-       <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyDxD7iX3xYWl08_8if_DwbEhnXtOndcEI",
-        authDomain: "dynt-voting.firebaseapp.com",
-        projectId: "dynt-voting",
-        storageBucket: "dynt-voting.firebasestorage.app",
-        messagingSenderId: "1014512631800",
-        appId: "1:1014512631800:web:aa14e9a7097c5fe7f2e00d",
-        measurementId: "G-YZEX0Y7RNX"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    window.auth = getAuth(app);
-    window.db = getFirestore(app);
-</script>
+  <script type="module" src="./firebase-config.js"></script>
+<script type="module" src="./main.js"></script>
 
 </body>
 </html>
