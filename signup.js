@@ -1,12 +1,6 @@
-import { 
-  createUserWithEmailAndPassword, 
-  updateProfile 
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import { 
-  doc, 
-  setDoc 
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { auth, db } from "./firebase-config.js";
+import { createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', function() {
   const signupForm = document.getElementById('signupForm');
@@ -18,9 +12,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const hasCapital = /[A-Z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
     
-    if (password.length < minLength) return 'Password must be at least 8 characters long';
-    if (!hasCapital) return 'Password must include at least 1 capital letter';
-    if (!hasNumber) return 'Password must include at least 1 number';
+    if (password.length < minLength) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!hasCapital) {
+      return 'Password must include at least 1 capital letter';
+    }
+    if (!hasNumber) {
+      return 'Password must include at least 1 number';
+    }
     return null;
   }
 
@@ -62,17 +62,17 @@ document.addEventListener('DOMContentLoaded', function() {
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         fullName,
-        username,
         age: parseInt(age),
+        username,
         email,
         createdAt: new Date().toISOString()
       });
 
-      alert("Account created successfully!");
-      window.location.href = "index.html";
+      alert('Account created successfully! You can now login.');
+      window.location.href = 'main.html';
 
     } catch (error) {
-      alert("Error: " + error.message);
+      alert('Signup failed: ' + error.message);
     }
   });
 });
