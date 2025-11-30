@@ -11,7 +11,7 @@
     <h1>Welcome to DYNT VOTING</h1>
     <div id="userInfo"></div>
 
-     <div class="button-group">
+    <div class="button-group">
       <button onclick="window.location.href='profile.html'" class="secondary-button">
         Profile
       </button>
@@ -21,28 +21,35 @@
       </button>
 
       <button onclick="window.location.href='joinElections.html'" class="secondary-button">
-  Join Elections
-</button>
+        Join Elections
+      </button>
 
-<button onclick="window.location.href='myElections.html'" class="secondary-button">
-  My Elections
-</button>
+      <button onclick="window.location.href='myElections.html'" class="secondary-button">
+        My Elections
+      </button>
 
-<button onclick="window.location.href='results.html'" class="secondary-button">
-  Results
-</button>
+      <button onclick="window.location.href='results.html'" class="secondary-button">
+        Results
+      </button>
+    </div>
 
-    
-   <div class="button-group">
-  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ykone@oakland.edu&su=DYNT VOTING Support Request&body=Hello, I need assistance with my DYNT VOTING account." 
-     target="_blank" class="support-button">
-    Contact Support
-  </a>
-  <button onclick="logout()" class="secondary-button">Logout</button>
-</div>
+    <div class="button-group">
+      <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ykone@oakland.edu&su=DYNT VOTING Support Request&body=Hello, I need assistance with my DYNT VOTING account."
+         target="_blank" class="support-button">
+        Contact Support
+      </a>
 
+      <!-- FIXED: logout must use JS event handler, not inline -->
+      <button id="logoutButton" class="secondary-button">Logout</button>
+    </div>
+  </div>
+
+  <!-- Firebase Config -->
   <script type="module" src="./firebase-config.js"></script>
-<script type="module" src="./main.js"></script>
+
+  <!-- Main logic (handles logout + user display) -->
+  <script type="module" src="./main.js"></script>
 
 </body>
 </html>
+
