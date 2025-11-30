@@ -1,5 +1,27 @@
-document.addEventListener('DOMContentLoaded', async function() {
-  const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+import { auth, db } from "./firebase-config.js";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  updateDoc
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+document.addEventListener('DOMContentLoaded', function() {
+  let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+
+  onAuthStateChanged(auth, function(user) {
+    if (!user) {
+      window.location.href = 'index.html';
+      return;
+    }
+    if (!currentUser) {
+      currentUser = { username: user.email || user.uid };
+    }
+  });
 
   if (!currentUser) {
     window.location.href = 'index.html';
@@ -10,155 +32,78 @@ document.addEventListener('DOMContentLoaded', async function() {
   const myElectionsError = document.getElementById('myElectionsError');
   const myElectionsSuccess = document.getElementById('myElectionsSuccess');
 
-  // --------------------------------------------------------------------
-  // 🔥 FIREBASE: LOAD USER'S ELECTIONS FROM FIRESTORE
-  // --------------------------------------------------------------------
-  let firebaseElections = [];
-  try {
-    const user = auth.currentUser;
+  let myElections = [];
 
-    if (user) {
-      const snapshot = await db
-        .collection("polls")
-        .where("ownerUID", "==", user.uid)
-        .get();
-
-      snapshot.forEach(doc => {
-        firebaseElections.push({
-          firebaseId: doc.id,
-          ...doc.data()
-        });
-      });
-
-      console.log("Firebase My Elections:", firebaseElections);
-    }
-  } catch (err) {
-    console.warn("Could not load Firebase elections:", err);
-  }
-
-  // -------------------------------------------------------
-  // ORIGINAL LOCAL STORAGE ELECTIONS
-  // -------------------------------------------------------
-  let localElections = JSON.parse(localStorage.getItem('elections') || '[]');
-
-  // -------------------------------------------------------
-  // 🔥 MERGE FIREBASE + LOCAL
-  // -------------------------------------------------------
-  let elections = [...firebaseElections, ...localElections];
-
-  // ------------------ AUTO-CLOSE LOCAL ELECTIONS -----------------------
-  function autoCloseElections() {
-    let changed = false;
-    const now = new Date();
-
-    localElections.forEach(election => {
-      if (!election.isClosed && election.endAt) {
-        const endTime = new Date(election.endAt);
-        if (!isNaN(endTime.getTime()) && now >= endTime) {
-          election.isClosed = true;
-          election.endedAt = now.toISOString();
-          changed = true;
-        }
-      }
-    });
-
-    if (changed) {
-      localStorage.setItem('elections', JSON.stringify(localElections));
-    }
-  }
-
-  autoCloseElections();
-  localElections = JSON.parse(localStorage.getItem('elections') || '[]');
-
-  // -------------------------------------------------------
-  // 🔥 LOAD FIREBASE VOTES FOR EACH ELECTION
-  // -------------------------------------------------------
-  async function loadFirebaseVotes(election) {
-    if (!election.firebaseId) return;
-
-    try {
-      const snapshot = await db
-        .collection("polls")
-        .doc(election.firebaseId)
-        .collection("votes")
-        .get();
-
-      election.firebaseVotes = [];
-      snapshot.forEach(doc => election.firebaseVotes.push(doc.data()));
-    } catch (err) {
-      console.warn("Firebase vote load failed:", err);
-    }
-  }
-
-  // ---------------- HELPERS (UNCHANGED) ----------------
-  function getVoteCounts(election) {
-    const counts = new Array(election.candidates.length).fill(0);
-
-    // Local votes
-    if (Array.isArray(election.votes)) {
-      election.votes.forEach(v => {
-        if (v.candidateIndex >= 0 && v.candidateIndex < counts.length) {
-          counts[v.candidateIndex]++;
-        }
-      });
-    }
-
-    // Firebase votes
-    if (Array.isArray(election.firebaseVotes)) {
-      election.firebaseVotes.forEach(v => {
-        counts[v.candidateIndex]++;
-      });
-    }
-
-    return counts;
-  }
-
-  function computeWinner(election) {
-    const counts = getVoteCounts(election);
-    const totalVotes = counts.reduce((sum, v) => sum + v, 0);
-
-    if (totalVotes === 0) {
-      return { totalVotes: 0, winners: [], maxVotes: 0 };
-    }
-
-    const maxVotes = Math.max(...counts);
-    const winners = [];
-
-    counts.forEach((v, idx) => {
-      if (v === maxVotes) winners.push(idx);
-    });
-
-    return { totalVotes, winners, maxVotes };
-  }
-
-  // ----------------------------------------------------------------
-  // RENDER ELECTION CARDS (LOCAL + FIREBASE)
-  // ----------------------------------------------------------------
-  async function renderMyElections() {
+  async function loadMyElections() {
     myElectionsList.innerHTML = '';
 
-    // localReload
-    localElections = JSON.parse(localStorage.getItem('elections') || '[]');
+    const q = query(collection(db, "polls"), where("ownerUsername", "==", currentUser.username));
+    const snap = await getDocs(q);
 
-    // merge again
-    elections = [...firebaseElections, ...localElections];
+    myElections = [];
+    snap.forEach(docSnap => {
+      myElections.push(docSnap.data());
+    });
 
-    // Filter by owner
-    const user = auth.currentUser;
-    const myLocal = localElections.filter(e => e.ownerUsername === currentUser.username);
-    const myFirebase = firebaseElections.filter(e => e.ownerUID === user?.uid);
-
-    const myAll = [...myFirebase, ...myLocal];
-
-    if (myAll.length === 0) {
+    if (myElections.length === 0) {
       myElectionsList.innerHTML = '<p>You have not created any elections yet.</p>';
       return;
     }
 
-    for (let election of myAll) {
-      if (election.firebaseId) {
-        await loadFirebaseVotes(election);
+    renderMyElections();
+  }
+
+  async function loadVotes(electionId) {
+    const voteSnap = await getDocs(collection(db, "polls", electionId, "votes"));
+    const votes = [];
+    voteSnap.forEach(v => votes.push(v.data()));
+    return votes;
+  }
+
+  function getVoteCounts(election, votes) {
+    const counts = new Array(election.candidates.length).fill(0);
+    votes.forEach(v => {
+      if (v.candidateIndex >= 0 && v.candidateIndex < counts.length) {
+        counts[v.candidateIndex]++;
       }
+    });
+    return counts;
+  }
+
+  function computeWinner(election, votes) {
+    const counts = getVoteCounts(election, votes);
+    const totalVotes = counts.reduce((sum, c) => sum + c, 0);
+
+    if (totalVotes === 0) {
+      return {
+        totalVotes: 0,
+        winners: [],
+        maxVotes: 0
+      };
+    }
+
+    let maxVotes = Math.max(...counts);
+    let winnerIndexes = [];
+
+    counts.forEach((count, idx) => {
+      if (count === maxVotes) {
+        winnerIndexes.push(idx);
+      }
+    });
+
+    return {
+      totalVotes: totalVotes,
+      winners: winnerIndexes,
+      maxVotes: maxVotes
+    };
+  }
+
+  async function renderMyElections() {
+    myElectionsList.innerHTML = '';
+
+    for (const election of myElections) {
+      const votes = await loadVotes(election.id);
+      const winnerInfo = computeWinner(election, votes);
 
       const card = document.createElement('div');
       card.className = 'election-card';
@@ -168,38 +113,37 @@ document.addEventListener('DOMContentLoaded', async function() {
       card.style.borderTop = '1px solid #eee';
 
       const status = election.isClosed ? 'Closed' : 'Open';
-      const winnerInfo = computeWinner(election);
 
-      // Winner text (local behavior preserved)
       let winnerText = '';
       if (election.isClosed) {
         if (winnerInfo.totalVotes === 0) {
-          winnerText = 'No votes were cast.';
+          winnerText = 'No votes were cast. No winner.';
         } else if (winnerInfo.winners.length === 1) {
           const winnerCandidate = election.candidates[winnerInfo.winners[0]];
-          const name = winnerCandidate ? winnerCandidate.name : 'Unknown';
-          winnerText = `Winner: ${name} (${winnerInfo.maxVotes} votes)`;
+          const name = winnerCandidate ? winnerCandidate.name : 'Unknown Candidate';
+          winnerText = `Winner: ${name} with ${winnerInfo.maxVotes} vote(s).`;
         } else {
-          const names = winnerInfo.winners
-            .map(i => election.candidates[i]?.name || 'Unknown')
-            .join(', ');
-          winnerText = `Tie between: ${names}`;
+          const names = winnerInfo.winners.map(idx => {
+            const c = election.candidates[idx];
+            return c ? c.name : 'Unknown';
+          }).join(', ');
+          winnerText = `Tie between: ${names} with ${winnerInfo.maxVotes} vote(s) each.`;
         }
       } else {
-        winnerText = 'Election is still open.';
+        winnerText = 'Election is still open. End the election to finalize results.';
       }
 
-      // Candidate list
-      const voteCounts = getVoteCounts(election);
+      const counts = getVoteCounts(election, votes);
       let candidatesHtml = '';
       election.candidates.forEach((candidate, cIndex) => {
+        const votesForThis = counts[cIndex] || 0;
         candidatesHtml += `
           <div class="form-group">
             <strong>${candidate.name || 'Unnamed Candidate'}</strong>
             <div style="margin-left: 1.25rem; font-size: 0.9rem;">
-              ${candidate.description || ''}
-              ${candidate.imageUrl ? `<br><img src="${candidate.imageUrl}" style="max-width: 100%; max-height:150px;">` : ''}
-              <br><span>Votes: ${voteCounts[cIndex]}</span>
+              ${candidate.description ? candidate.description : ''}
+              ${candidate.imageUrl ? `<br><img src="${candidate.imageUrl}" alt="Candidate image" style="max-width: 100%; max-height: 150px; margin-top: 0.25rem;">` : ''}
+              <br><span>Votes: ${votesForThis}</span>
             </div>
           </div>
         `;
@@ -209,23 +153,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         <h2>${election.title}</h2>
         <p>${election.description}</p>
         <p><strong>Status:</strong> ${status}</p>
-        <p><strong>Visibility:</strong> ${election.visibility}</p>
-        <p><strong>Access Code:</strong> ${election.accessCode}</p>
-        <p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>
+        <p><strong>Visibility:</strong> ${election.visibility === 'public' ? 'Public' : 'Private'}</p>
+        ${election.accessCode ? `<p><strong>Access Code:</strong> ${election.accessCode}</p>` : ''}
+        ${election.endAt ? `<p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>` : ''}
+        <p><strong>Minimum Age:</strong> ${election.minAge}</p>
         <p><strong>Total Votes:</strong> ${winnerInfo.totalVotes}</p>
         <p><strong>Result:</strong> ${winnerText}</p>
         <h3>Candidates</h3>
         ${candidatesHtml}
       `;
 
-      // END ELECTION BUTTON
       if (!election.isClosed) {
         const endButton = document.createElement('button');
         endButton.textContent = 'End Election';
         endButton.style.marginTop = '0.5rem';
 
         endButton.addEventListener('click', function() {
-          endElection(election);
+          endElection(election.id);
         });
 
         card.appendChild(endButton);
@@ -235,46 +179,56 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
 
-  // ------------------------------------------------------------
-  // 🔥 END ELECTION (LOCAL + FIREBASE)
-  // ------------------------------------------------------------
-  async function endElection(election) {
+  async function endElection(electionId) {
     myElectionsError.textContent = '';
     myElectionsSuccess.textContent = '';
 
-    const winnerInfo = computeWinner(election);
-
-    // LOCAL UPDATE
-    let localAll = JSON.parse(localStorage.getItem('elections') || '[]');
-    const idx = localAll.findIndex(e => e.id === election.id);
-    if (idx !== -1) {
-      localAll[idx].isClosed = true;
-      localAll[idx].endedAt = new Date().toISOString();
-      localAll[idx].resultSummary = winnerInfo;
-      localStorage.setItem('elections', JSON.stringify(localAll));
+    const elecDoc = await getDoc(doc(db, "polls", electionId));
+    if (!elecDoc.exists()) {
+      myElectionsError.textContent = 'Election not found or you are not the owner.';
+      return;
     }
 
-    // FIREBASE UPDATE
-    if (election.firebaseId) {
-      try {
-        await db.collection("polls")
-          .doc(election.firebaseId)
-          .update({
-            isClosed: true,
-            endedAt: new Date().toISOString(),
-            resultSummary: winnerInfo
-          });
-        console.log("Election ended in Firebase.");
-      } catch (err) {
-        console.warn("Firebase end election failed:", err);
+    const election = elecDoc.data();
+    if (election.ownerUsername !== currentUser.username) {
+      myElectionsError.textContent = 'Election not found or you are not the owner.';
+      return;
+    }
+
+    if (election.isClosed) {
+      myElectionsError.textContent = 'This election is already closed.';
+      return;
+    }
+
+    const votes = await loadVotes(electionId);
+    const winnerInfo = computeWinner(election, votes);
+
+    await updateDoc(doc(db, "polls", electionId), {
+      isClosed: true,
+      endedAt: new Date().toISOString(),
+      resultSummary: {
+        totalVotes: winnerInfo.totalVotes,
+        winners: winnerInfo.winners,
+        maxVotes: winnerInfo.maxVotes
       }
+    });
+
+    if (winnerInfo.totalVotes === 0) {
+      myElectionsSuccess.textContent = 'Election ended. No votes were cast.';
+    } else if (winnerInfo.winners.length === 1) {
+      const winnerCandidate = election.candidates[winnerInfo.winners[0]];
+      const name = winnerCandidate ? winnerCandidate.name : 'Unknown Candidate';
+      myElectionsSuccess.textContent = `Election ended. Winner: ${name} with ${winnerInfo.maxVotes} vote(s).`;
+    } else {
+      const names = winnerInfo.winners.map(idx => {
+        const c = election.candidates[idx];
+        return c ? c.name : 'Unknown';
+      }).join(', ');
+      myElectionsSuccess.textContent = `Election ended. It's a tie between: ${names} with ${winnerInfo.maxVotes} vote(s) each.`;
     }
 
-    myElectionsSuccess.textContent = "Election ended successfully.";
-    renderMyElections();
+    loadMyElections();
   }
 
-  // Initial render
-  renderMyElections();
-
+  loadMyElections();
 });
