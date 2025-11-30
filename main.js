@@ -1,70 +1,71 @@
-document.addEventListener('DOMContentLoaded', function() {
+import { auth, db } from "./firebase-config.js";
+import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
+document.addEventListener("DOMContentLoaded", () => {
+  const userInfoDiv = document.getElementById("userInfo");
+  const logoutButton = document.getElementById("logoutButton");
 
-  auth.onAuthStateChanged(function(user) {
+  // ------------------------------
+  // HANDLE AUTH STATE
+  // ------------------------------
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // User is logged in with Firebase
-      console.log("Firebase user detected:", user.email);
+      console.log("Firebase user logged in:", user.email);
 
-      // Load Firestore profile (if saved)
-      db.collection("users").doc(user.uid).get()
-        .then(doc => {
-          if (doc.exists) {
-            const data = doc.data();
+      // Load Firestore data
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
 
-            document.getElementById('userInfo').innerHTML = `
-              <p>Welcome, <strong>${data.fullName}</strong>!</p>
-              <p>Username: ${data.username}</p>
-              <p>Email: ${data.email}</p>
-            `;
-          } else {
-            // Firebase user exists but no Firestore profile
-            document.getElementById('userInfo').innerHTML = `
-              <p>Welcome!</p>
-              <p>Email: ${user.email}</p>
-              <p>(Profile not found in Firestore)</p>
-            `;
-          }
-        });
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+
+        userInfoDiv.innerHTML = `
+          <p>Welcome, <strong>${data.fullName}</strong>!</p>
+          <p>Username: ${data.username}</p>
+          <p>Email: ${data.email}</p>
+        `;
+      } else {
+        // Firestore profile not found
+        userInfoDiv.innerHTML = `
+          <p>Welcome!</p>
+          <p>Email: ${user.email}</p>
+          <p>(No Firestore profile found)</p>
+        `;
+      }
 
     } else {
+      // Not logged in — try localStorage fallback
+      const localUser = JSON.parse(localStorage.getItem("currentUser"));
 
-      const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
-      if (!currentUser) {
-        window.location.href = 'index.html';
+      if (!localUser) {
+        window.location.href = "index.html";
         return;
       }
 
-      document.getElementById('userInfo').innerHTML = `
-        <p>Welcome, <strong>${currentUser.fullName}</strong>!</p>
-        <p>Username: ${currentUser.username}</p>
-        <p>Email: ${currentUser.email}</p>
+      userInfoDiv.innerHTML = `
+        <p>Welcome, <strong>${localUser.fullName}</strong>!</p>
+        <p>Username: ${localUser.username}</p>
+        <p>Email: ${localUser.email}</p>
       `;
     }
   });
 
+  // ------------------------------
+  // LOGOUT BUTTON
+  // ------------------------------
+  logoutButton.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn("Firebase signOut failed:", err);
+    }
+
+    // Always clear local backup
+    localStorage.removeItem("currentUser");
+
+    // Redirect
+    window.location.href = "index.html";
+  });
 });
-
-
-// -------------------------------------------------------
-// LOGOUT
-// -------------------------------------------------------
-function logout() {
-
-  // Try Firebase logout first
-  auth.signOut()
-    .then(() => {
-      console.log("Firebase logout successful");
-    })
-    .catch(err => {
-      console.warn("Firebase logout failed (maybe not logged in):", err);
-    });
-
-  // Always clear localStorage for backward compatibility
-  localStorage.removeItem('currentUser');
-
-  // Redirect
-  window.location.href = 'index.html';
-}
 
