@@ -1,8 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import {
-  collection,
-  addDoc
-} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -169,8 +166,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     try {
       const docRef = await addDoc(collection(db, "polls"), newElection);
-      await addDoc(collection(db, "polls"), newElection);
-      // actually we don't want duplicate; fix: store id field on same doc
+      const id = docRef.id;
+      await updateDoc(doc(db, "polls", id), { id: id });
+
     } catch (error) {
       alert('Error creating election: ' + error.message);
       return;
