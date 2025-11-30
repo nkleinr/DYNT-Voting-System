@@ -10,30 +10,39 @@
   <div class="container">
     <h1>Sign Up</h1>
     <form id="signupForm">
+
       <div class="form-group">
         <label for="fullName">Full Name:</label>
         <input type="text" id="fullName" name="fullName" required>
       </div>
+
       <div class="form-group">
         <label for="age">Age:</label>
         <input type="number" id="age" name="age" required>
       </div>
+
       <div class="form-group">
         <label for="signupUsername">Username:</label>
         <input type="text" id="signupUsername" name="username" required>
       </div>
+
       <div class="form-group">
         <label for="signupEmail">Email:</label>
         <input type="email" id="signupEmail" name="email" required>
       </div>
+
       <div class="form-group">
         <label for="signupPassword">Password:</label>
         <input type="password" id="signupPassword" name="password" required>
+        <div id="passwordError" class="error-message"></div>
       </div>
+
       <div class="form-group">
         <label for="confirmPassword">Confirm Password:</label>
         <input type="password" id="confirmPassword" name="confirmPassword" required>
+        <div id="confirmPasswordError" class="error-message"></div>
       </div>
+
       <button type="submit" id="signupSubmit">Create Account</button>
     </form>
     
@@ -44,12 +53,12 @@
       </button>
     </div>
   </div>
-<!-- Load Firebase config first -->
-<script type="module" src="./firebase-config.js"></script>
 
-<!-- Page-specific logic file -->
-<script type="module" src="./signup.js"></script>
+  <!-- Load Firebase config -->
+  <script type="module" src="./firebase-config.js"></script>
 
+  <!-- Page-specific logic -->
+  <script type="module" src="./signup.js"></script>
 
 </body>
 </html>
