@@ -8,20 +8,20 @@
 </head>
 <body>
   <div class="container">
-    <h1 id="myH1">Welcome to DYNT Voting</h1>
-
+    <h1 id="myH1">Welcome TO DYNT VOTING</h1> 
+    
     <form id="loginForm">
       <div class="form-group">
-        <label for="loginUsername">Username:</label>
-        <input type="text" id="loginUsername" name="username" required>
+        <label for="loginEmail">Email:</label>
+        <input type="email" id="loginEmail" name="email" required>
       </div>
-
+      
       <div class="form-group">
         <label for="loginPassword">Password:</label>
         <input type="password" id="loginPassword" name="password" required>
         <div id="loginError" class="error-message"></div>
       </div>
-
+      
       <button type="submit" id="loginSubmit">Login</button>
     </form>
 
@@ -33,12 +33,11 @@
     </div>
   </div>
 
-  <!-- Firebase config -->
-  <script type="module" src="./firebase-config.js"></script>
+<!-- Firebase config -->
+<script type="module" src="./firebase-config.js"></script>
 
-  <!-- Login logic -->
-  <script type="module" src="./index.js"></script>
+<!-- This page’s logic -->
+<script type="module" src="./index.js"></script>
 
 </body>
 </html>
-
