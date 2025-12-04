@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
     myElections = [];
     snap.forEach(docSnap => {
       let data = docSnap.data();
-      data.id = docSnap.id;  // include ID for Firestore updates
+      data.id = docSnap.id; 
       myElections.push(data);
     });
 
@@ -101,20 +101,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
       let winnerText = election.isClosed
         ? winnerInfo.totalVotes === 0
-            ? 'No votes were cast. No winner.'
-            : winnerInfo.winners.length === 1
-                ? `Winner: ${election.candidates[winnerInfo.winners[0]].name}`
-                : `Tie between: ${winnerInfo.winners.map(i => election.candidates[i].name).join(', ')}`
+          ? 'No votes were cast. No winner.'
+          : winnerInfo.winners.length === 1
+            ? `Winner: ${election.candidates[winnerInfo.winners[0]].name} (${winnerInfo.maxVotes} votes)`
+            : `Tie between: ${winnerInfo.winners.map(i => election.candidates[i].name).join(', ')}`
         : 'Election is still open. End the election to finalize results.';
 
-      // Build candidates list
-      let candidatesHtml = election.candidates.map((c, i) => {
-        const votesForThis = getVoteCounts(election, votes)[i] || 0;
-        return `
-          <div>
-            <strong>${c.name}</strong> - Votes: ${votesForThis}
-          </div>`;
-      }).join("");
+      let candidatesHtml = election.candidates.map((c, i) => `
+        <div>
+          <strong>${c.name}</strong> - Votes: ${getVoteCounts(election, votes)[i] || 0}
+        </div>
+      `).join("");
 
       card.innerHTML = `
         <h2>${election.title}</h2>
@@ -129,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ${candidatesHtml}
       `;
 
-      // ----- BUTTON LOGIC -----
+      // ---------------- BUTTON LOGIC -----------------
 
       if (!election.isClosed) {
         const endButton = document.createElement('button');
@@ -146,11 +143,18 @@ document.addEventListener('DOMContentLoaded', function() {
         card.appendChild(openButton);
       }
 
+      // Add Export Results Button (always visible)
+      const exportBtn = document.createElement('button');
+      exportBtn.textContent = 'Export Results';
+      exportBtn.style.marginTop = '0.5rem';
+      exportBtn.onclick = () => exportResults(election, votes);
+      card.appendChild(exportBtn);
+
       myElectionsList.appendChild(card);
     }
   }
 
-  // ----- CLOSE ELECTION -----
+  // ---------------- END ELECTION -----------------
   async function endElection(electionId) {
     const elecDoc = await getDoc(doc(db, "polls", electionId));
     if (!elecDoc.exists()) return alert("Election not found.");
@@ -168,10 +172,35 @@ document.addEventListener('DOMContentLoaded', function() {
     loadMyElections();
   }
 
-  // ----- OPEN ELECTION -----
+  // ---------------- OPEN ELECTION -----------------
   async function openElection(electionId) {
     await updateDoc(doc(db, "polls", electionId), { isClosed: false });
     loadMyElections();
+  }
+
+  // ---------------- EXPORT RESULTS -----------------
+  function exportResults(election, votes) {
+    const rows = [
+      ["Election Title", election.title],
+      ["Description", election.description || ""],
+      ["Status", election.isClosed ? "Closed" : "Open"],
+      ["Total Votes", votes.length],
+      [],
+      ["Candidate", "Votes"]
+    ];
+
+    const counts = getVoteCounts(election, votes);
+    election.candidates.forEach((c, i) => {
+      rows.push([c.name, counts[i] || 0]);
+    });
+
+    const csvContent = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${election.title.replace(/\s+/g,'_')}_results.csv`;
+    a.click();
   }
 
   loadMyElections();
