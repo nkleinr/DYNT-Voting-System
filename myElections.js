@@ -42,7 +42,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     myElections = [];
     snap.forEach(docSnap => {
-      myElections.push(docSnap.data());
+      let data = docSnap.data();
+      data.id = docSnap.id;  // include ID for Firestore updates
+      myElections.push(data);
     });
 
     if (myElections.length === 0) {
@@ -74,28 +76,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const counts = getVoteCounts(election, votes);
     const totalVotes = counts.reduce((sum, c) => sum + c, 0);
 
-    if (totalVotes === 0) {
-      return {
-        totalVotes: 0,
-        winners: [],
-        maxVotes: 0
-      };
-    }
+    if (totalVotes === 0) return { totalVotes: 0, winners: [], maxVotes: 0 };
 
-    let maxVotes = Math.max(...counts);
-    let winnerIndexes = [];
+    const maxVotes = Math.max(...counts);
+    const winners = counts
+      .map((count, idx) => count === maxVotes ? idx : null)
+      .filter(idx => idx !== null);
 
-    counts.forEach((count, idx) => {
-      if (count === maxVotes) {
-        winnerIndexes.push(idx);
-      }
-    });
-
-    return {
-      totalVotes: totalVotes,
-      winners: winnerIndexes,
-      maxVotes: maxVotes
-    };
+    return { totalVotes, winners, maxVotes };
   }
 
   async function renderMyElections() {
@@ -107,126 +95,82 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const card = document.createElement('div');
       card.className = 'election-card';
-      card.style.textAlign = 'left';
       card.style.marginTop = '1.5rem';
-      card.style.paddingTop = '1rem';
-      card.style.borderTop = '1px solid #eee';
 
       const status = election.isClosed ? 'Closed' : 'Open';
 
-      let winnerText = '';
-      if (election.isClosed) {
-        if (winnerInfo.totalVotes === 0) {
-          winnerText = 'No votes were cast. No winner.';
-        } else if (winnerInfo.winners.length === 1) {
-          const winnerCandidate = election.candidates[winnerInfo.winners[0]];
-          const name = winnerCandidate ? winnerCandidate.name : 'Unknown Candidate';
-          winnerText = `Winner: ${name} with ${winnerInfo.maxVotes} vote(s).`;
-        } else {
-          const names = winnerInfo.winners.map(idx => {
-            const c = election.candidates[idx];
-            return c ? c.name : 'Unknown';
-          }).join(', ');
-          winnerText = `Tie between: ${names} with ${winnerInfo.maxVotes} vote(s) each.`;
-        }
-      } else {
-        winnerText = 'Election is still open. End the election to finalize results.';
-      }
+      let winnerText = election.isClosed
+        ? winnerInfo.totalVotes === 0
+            ? 'No votes were cast. No winner.'
+            : winnerInfo.winners.length === 1
+                ? `Winner: ${election.candidates[winnerInfo.winners[0]].name}`
+                : `Tie between: ${winnerInfo.winners.map(i => election.candidates[i].name).join(', ')}`
+        : 'Election is still open. End the election to finalize results.';
 
-      const counts = getVoteCounts(election, votes);
-      let candidatesHtml = '';
-      election.candidates.forEach((candidate, cIndex) => {
-        const votesForThis = counts[cIndex] || 0;
-        candidatesHtml += `
-          <div class="form-group">
-            <strong>${candidate.name || 'Unnamed Candidate'}</strong>
-            <div style="margin-left: 1.25rem; font-size: 0.9rem;">
-              ${candidate.description ? candidate.description : ''}
-              ${candidate.imageUrl ? `<br><img src="${candidate.imageUrl}" alt="Candidate image" style="max-width: 100%; max-height: 150px; margin-top: 0.25rem;">` : ''}
-              <br><span>Votes: ${votesForThis}</span>
-            </div>
-          </div>
-        `;
-      });
+      // Build candidates list
+      let candidatesHtml = election.candidates.map((c, i) => {
+        const votesForThis = getVoteCounts(election, votes)[i] || 0;
+        return `
+          <div>
+            <strong>${c.name}</strong> - Votes: ${votesForThis}
+          </div>`;
+      }).join("");
 
       card.innerHTML = `
         <h2>${election.title}</h2>
-        <p>${election.description}</p>
+        <p>${election.description || ""}</p>
         <p><strong>Status:</strong> ${status}</p>
-        <p><strong>Visibility:</strong> ${election.visibility === 'public' ? 'Public' : 'Private'}</p>
-        ${election.accessCode ? `<p><strong>Access Code:</strong> ${election.accessCode}</p>` : ''}
-        ${election.endAt ? `<p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>` : ''}
-        <p><strong>Minimum Age:</strong> ${election.minAge}</p>
+        <p><strong>Visibility:</strong> ${election.visibility || "Public"}</p>
+        ${election.accessCode ? `<p><strong>Access Code:</strong> ${election.accessCode}</p>` : ""}
+        ${election.endAt ? `<p><strong>Ends At:</strong> ${new Date(election.endAt).toLocaleString()}</p>` : ""}
         <p><strong>Total Votes:</strong> ${winnerInfo.totalVotes}</p>
         <p><strong>Result:</strong> ${winnerText}</p>
         <h3>Candidates</h3>
         ${candidatesHtml}
       `;
 
+      // ----- BUTTON LOGIC -----
+
       if (!election.isClosed) {
         const endButton = document.createElement('button');
         endButton.textContent = 'End Election';
         endButton.style.marginTop = '0.5rem';
-
-        endButton.addEventListener('click', function() {
-          endElection(election.id);
-        });
-
+        endButton.onclick = () => endElection(election.id);
         card.appendChild(endButton);
+
+      } else {
+        const openButton = document.createElement('button');
+        openButton.textContent = 'Re-Open Election';
+        openButton.style.marginTop = '0.5rem';
+        openButton.onclick = () => openElection(election.id);
+        card.appendChild(openButton);
       }
 
       myElectionsList.appendChild(card);
     }
   }
 
+  // ----- CLOSE ELECTION -----
   async function endElection(electionId) {
-    myElectionsError.textContent = '';
-    myElectionsSuccess.textContent = '';
-
     const elecDoc = await getDoc(doc(db, "polls", electionId));
-    if (!elecDoc.exists()) {
-      myElectionsError.textContent = 'Election not found or you are not the owner.';
-      return;
-    }
+    if (!elecDoc.exists()) return alert("Election not found.");
 
     const election = elecDoc.data();
-    if (election.ownerUsername !== currentUser.username) {
-      myElectionsError.textContent = 'Election not found or you are not the owner.';
-      return;
-    }
-
-    if (election.isClosed) {
-      myElectionsError.textContent = 'This election is already closed.';
-      return;
-    }
-
     const votes = await loadVotes(electionId);
     const winnerInfo = computeWinner(election, votes);
 
     await updateDoc(doc(db, "polls", electionId), {
       isClosed: true,
       endedAt: new Date().toISOString(),
-      resultSummary: {
-        totalVotes: winnerInfo.totalVotes,
-        winners: winnerInfo.winners,
-        maxVotes: winnerInfo.maxVotes
-      }
+      resultSummary: winnerInfo
     });
 
-    if (winnerInfo.totalVotes === 0) {
-      myElectionsSuccess.textContent = 'Election ended. No votes were cast.';
-    } else if (winnerInfo.winners.length === 1) {
-      const winnerCandidate = election.candidates[winnerInfo.winners[0]];
-      const name = winnerCandidate ? winnerCandidate.name : 'Unknown Candidate';
-      myElectionsSuccess.textContent = `Election ended. Winner: ${name} with ${winnerInfo.maxVotes} vote(s).`;
-    } else {
-      const names = winnerInfo.winners.map(idx => {
-        const c = election.candidates[idx];
-        return c ? c.name : 'Unknown';
-      }).join(', ');
-      myElectionsSuccess.textContent = `Election ended. It's a tie between: ${names} with ${winnerInfo.maxVotes} vote(s) each.`;
-    }
+    loadMyElections();
+  }
 
+  // ----- OPEN ELECTION -----
+  async function openElection(electionId) {
+    await updateDoc(doc(db, "polls", electionId), { isClosed: false });
     loadMyElections();
   }
 
